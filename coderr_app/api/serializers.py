@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import Offer, OfferDetail, Order, CustomUser
+from ..models import Offer, OfferDetail, Order, CustomUser, Review
 
 
 class OfferDetailSerializer(serializers.ModelSerializer):
@@ -61,29 +61,29 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = '__all__'
 
-    def create(self, validated_data):
-        # Setze den logged-in User als 'customer_user'
-        validated_data['customer_user'] = self.context['request'].user
+    # def create(self, validated_data):
+    #     # Setze den logged-in User als 'customer_user'
+    #     validated_data['customer_user'] = self.context['request'].user
 
-        # Hole die OfferDetail-Instanz aus 'validated_data'
-        offer_detail = validated_data.pop('offer_detail')
+    #     # Hole die OfferDetail-Instanz aus 'validated_data'
+    #     offer_detail = validated_data.pop('offer_detail')
 
-        # Erstelle die Order mit den OfferDetail-Daten
-        order = Order.objects.create(
-            title=offer_detail.title,
-            revisions=offer_detail.revisions,
-            delivery_time_in_days=offer_detail.delivery_time_in_days,
-            price=offer_detail.price,
-            features=offer_detail.features,
-            offer_type=offer_detail.offer_type,
-            business_user=offer_detail.owner,
-            ** validated_data
-        )
-        if order.status is None:
-            order.status = 'in_progress'
-            order.save()
+    #     # Erstelle die Order mit den OfferDetail-Daten
+    #     order = Order.objects.create(
+    #         title=offer_detail.title,
+    #         revisions=offer_detail.revisions,
+    #         delivery_time_in_days=offer_detail.delivery_time_in_days,
+    #         price=offer_detail.price,
+    #         features=offer_detail.features,
+    #         offer_type=offer_detail.offer_type,
+    #         business_user=offer_detail.owner,
+    #         ** validated_data
+    #     )
+    #     if order.status is None:
+    #         order.status = 'in_progress'
+    #         order.save()
 
-        return order
+    #     return order
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -119,7 +119,6 @@ class CustomerUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['user', 'file', 'type', 'created_at']
-        # fields = '__all__'
 
     def get_user(self, obj):
         return {
@@ -128,3 +127,62 @@ class CustomerUserSerializer(serializers.ModelSerializer):
             'first_name': obj.first_name,
             'last_name': obj.last_name
         }
+
+
+class RegistrationSerializer(serializers.ModelSerializer):
+    repeated_password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(
+        error_messages={
+            'invalid': ["E-Mail ist erforderlich.", "E-Mail-Format ist ungültig."]
+        }
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email', 'password', 'repeated_password', 'type']
+        extra_kwargs = {
+            'password': {
+                'write_only': True
+            }
+        }
+
+    def save(self, **kwargs):
+        username = self.validated_data['username']
+        pw = self.validated_data['password']
+        repeated_pw = self.validated_data['repeated_password']
+        email = self.validated_data['email']
+
+        if pw != repeated_pw:
+            raise serializers.ValidationError(
+                {'error': 'Passwords dont match'})
+
+        if CustomUser.objects.filter(email=email).exists():
+            raise serializers.ValidationError(
+                {'email': ['Diese E-Mail-Adresse wird bereits verwendet.']})
+
+        if CustomUser.objects.filter(username=username).exists():
+            raise serializers.ValidationError(
+                {'username': ['Dieser Benutzername ist bereits vergeben.']})
+
+        account = CustomUser(
+            email=self.validated_data['email'], username=self.validated_data['username'], type=self.validated_data['type'])
+        account.set_password(pw)
+        account.save()
+        return account
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Review
+        fields = '__all__'
+        extra_kwargs = {
+            'reviewer': {'read_only': True}
+        }
+
+
+class ReviewDetailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Review
+        fields = ['rating', 'description']
