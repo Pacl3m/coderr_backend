@@ -3,12 +3,8 @@ from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_MET
 
 class IsOwnerOrAdmin(BasePermission):
 
-    # def has_permission(self, request, view):
-    #     if request.method in SAFE_METHODS:
-    #         print('1')
-    #         return True
-
     def has_object_permission(self, request, view, obj):
+        print(request.user, obj.user, request.method)
         if request.method in SAFE_METHODS:
             print('1')
             return True
@@ -32,7 +28,8 @@ class IsBusinessUser(BasePermission):
 class IsSuperUser(BasePermission):
 
     def has_permission(self, request, view):
-        # if request.method in SAFE_METHODS:
-        #     return True
-        if request.user.is_superuser:
+        if request.method in SAFE_METHODS:
+            print('8')
+            return True
+        elif request.user.is_superuser:
             return True

@@ -30,7 +30,7 @@ class OfferDetail(models.Model):
     offer = models.ForeignKey(
         Offer, on_delete=models.CASCADE, related_name="details", null=False, default=1
     )
-    owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, default=1)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, default=1)
     title = models.CharField(max_length=255)
     revisions = models.IntegerField()
     delivery_time_in_days = models.IntegerField()

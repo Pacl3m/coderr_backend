@@ -6,7 +6,7 @@ class OfferDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OfferDetail
-        exclude = ['offer', 'owner']
+        exclude = ['offer', 'user']
 
 
 class OfferSerializer(serializers.ModelSerializer):
@@ -45,7 +45,7 @@ class OfferSerializer(serializers.ModelSerializer):
             detail_instance, created = OfferDetail.objects.update_or_create(
                 offer=offer,
                 offer_type=offer_type,
-                owner=self.context['request'].user,
+                user=self.context['request'].user,
                 defaults=detail_data
             )
 

@@ -2,7 +2,7 @@ from rest_framework import viewsets, generics
 from ..models import Offer, OfferDetail, Order, Review
 from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, mixins, viewsets
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
@@ -13,7 +13,8 @@ from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsBusinessUser, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticatedOrReadOnly,
+                          IsBusinessUser, IsOwnerOrAdmin]
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -35,10 +36,12 @@ class OfferViewSet(viewsets.ModelViewSet):
         return Response(offer_data)
 
 
-class OfferDetailViewSet(viewsets.ModelViewSet):
+class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
+                         mixins.DestroyModelMixin):
     queryset = OfferDetail.objects.all()
     serializer_class = OfferDetailSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsBusinessUser, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticatedOrReadOnly &
+                          IsSuperUser | IsOwnerOrAdmin]
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -76,7 +79,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             price=offer_detail.price,
             features=offer_detail.features,
             offer_type=offer_detail.offer_type,
-            business_user=offer_detail.owner,
+            business_user=offer_detail.user,
             status='in_progress'
         )
         return Response(serializer.data)
