@@ -1,16 +1,19 @@
 from rest_framework import viewsets, generics
 from ..models import Offer, OfferDetail, Order, Review
-from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer
+from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser
 
 
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly, IsBusinessUser, IsOwnerOrAdmin]
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -35,15 +38,20 @@ class OfferViewSet(viewsets.ModelViewSet):
 class OfferDetailViewSet(viewsets.ModelViewSet):
     queryset = OfferDetail.objects.all()
     serializer_class = OfferDetailSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly, IsBusinessUser, IsOwnerOrAdmin]
 
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
-    serializer_class = OrderSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return OrderDetailSerializer
+        return OrderSerializer
 
     def retrieve(self, request, *args, **kwargs):
-        order = self.get_object()  # Holt die Order-Instanz
-        serializer = self.get_serializer(order)  # Serialisiert die Instanz
+        order = self.get_object()
+        serializer = self.get_serializer(order)
 
         return Response(serializer.data)
 
@@ -57,13 +65,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def perform_create(self, serializer):
-        # Setze den eingeloggten User als 'customer_user'
         customer_user = self.request.user
-
-        # Hole die OfferDetail-Instanz über die offer_detail_id
         offer_detail = serializer.validated_data.pop('offer_detail')
 
-        # Erstelle die Order mit den OfferDetail-Daten
         serializer.save(
             customer_user=customer_user,
             title=offer_detail.title,
@@ -73,8 +77,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             features=offer_detail.features,
             offer_type=offer_detail.offer_type,
             business_user=offer_detail.owner,
-            status='in_progress'  # Falls nötig, Standardstatus setzen
+            status='in_progress'
         )
+        return Response(serializer.data)
 
 
 class OrderCountViewSet(viewsets.ViewSet):
@@ -134,7 +139,6 @@ class LoginAPIView(APIView):
         user = authenticate(username=username, password=password)
 
         if user is not None:
-            # Token erstellen oder abrufen
             token, created = Token.objects.get_or_create(user=user)
             return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_200_OK)
         return Response({"detail": ["Falsche Anmeldedaten."]}, status=status.HTTP_401_UNAUTHORIZED)

@@ -51,39 +51,28 @@ class OfferSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Order
+        fields = '__all__'
+        read_only_fields = ['id', 'title', 'revisions',
+                            'delivery_time_in_days', 'price', 'features', 'offer_type', 'created_at',
+                            'updated_at', 'customer_user', 'business_user']
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
     offer_detail_id = serializers.PrimaryKeyRelatedField(
-        queryset=OfferDetail.objects.all(),  # Validierung der ID
-        source='offer_detail',  # Verknüpfung mit dem Feld im Modell
-        write_only=True  # Nur beim POST sichtbar
+        queryset=OfferDetail.objects.all(),
+        source='offer_detail',
+        write_only=True
     )
 
     class Meta:
         model = Order
         fields = '__all__'
-
-    # def create(self, validated_data):
-    #     # Setze den logged-in User als 'customer_user'
-    #     validated_data['customer_user'] = self.context['request'].user
-
-    #     # Hole die OfferDetail-Instanz aus 'validated_data'
-    #     offer_detail = validated_data.pop('offer_detail')
-
-    #     # Erstelle die Order mit den OfferDetail-Daten
-    #     order = Order.objects.create(
-    #         title=offer_detail.title,
-    #         revisions=offer_detail.revisions,
-    #         delivery_time_in_days=offer_detail.delivery_time_in_days,
-    #         price=offer_detail.price,
-    #         features=offer_detail.features,
-    #         offer_type=offer_detail.offer_type,
-    #         business_user=offer_detail.owner,
-    #         ** validated_data
-    #     )
-    #     if order.status is None:
-    #         order.status = 'in_progress'
-    #         order.save()
-
-    #     return order
+        read_only_fields = ['id', 'title', 'revisions',
+                            'delivery_time_in_days', 'price', 'features', 'offer_type', 'status', 'created_at',
+                            'updated_at', 'customer_user', 'business_user']
 
 
 class UserSerializer(serializers.ModelSerializer):
