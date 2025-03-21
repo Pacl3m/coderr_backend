@@ -19,6 +19,12 @@ class OfferSerializer(serializers.ModelSerializer):
             'user': {'read_only': True}
         }
 
+    def validate_details(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "This field may not be blank.")
+        return value
+
     def create(self, validated_data):
         details_data = validated_data.pop('details')
         validated_data['user'] = self.context['request'].user
