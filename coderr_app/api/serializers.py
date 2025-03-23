@@ -3,26 +3,73 @@ from ..models import Offer, OfferDetail, Order, CustomUser, Review
 
 
 class OfferDetailSerializer(serializers.ModelSerializer):
+    # url = serializers.HyperlinkedIdentityField(view_name='offerdetails-detail')
 
     class Meta:
         model = OfferDetail
         exclude = ['offer', 'user']
+        # fields = ['id', 'url']
+
+
+class OfferDetailLinkSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='offerdetails-detail')
+
+    class Meta:
+        model = OfferDetail
+        fields = ['id', 'url']
 
 
 class OfferSerializer(serializers.ModelSerializer):
-    details = OfferDetailSerializer(many=True)
+    user_details = serializers.SerializerMethodField()
+    min_price = serializers.SerializerMethodField()
+    min_delivery_time = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
-        fields = ['id', 'user', 'title', 'image', 'description', 'details']
+        fields = ['id', 'user', 'title', 'image',
+                  'description', 'details', 'user_details', 'min_price', 'min_delivery_time']
         extra_kwargs = {
             'user': {'read_only': True}
         }
 
+    def get_fields(self):
+        fields = super().get_fields()
+
+        if self.context['request'].method in ['POST', 'PATCH', 'PUT']:
+            fields['details'] = OfferDetailSerializer(many=True)
+        else:
+            fields['details'] = OfferDetailLinkSerializer(many=True)
+
+        return fields
+
+    def get_min_price(self, obj):
+        offer_details = obj.details.all()
+        return min(detail.price for detail in offer_details)
+
+    def get_min_delivery_time(self, obj):
+        offer_details = obj.details.all()
+        return min(detail.delivery_time_in_days for detail in offer_details)
+
+    def get_user_details(self, obj):
+        user = obj.user  # Hier wird auf den verknüpften User der Offer-Instanz zugegriffen
+        return {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username
+        }
+
+    def to_representation(self, instance):
+        # Wenn der Request ein POST ist, entferne 'user_details'
+        representation = super().to_representation(instance)
+        if self.context['request'].method == 'POST':
+            representation.pop('user_details', None)
+            representation.pop('min_price', None)
+            representation.pop('min_delivery_time', None)
+        return representation
+
     def validate_details(self, value):
         if not value:
-            raise serializers.ValidationError(
-                "This field may not be blank.")
+            raise serializers.ValidationError("This field may not be blank.")
         return value
 
     def create(self, validated_data):
@@ -148,16 +195,15 @@ class RegistrationSerializer(serializers.ModelSerializer):
         email = self.validated_data['email']
 
         if pw != repeated_pw:
-            raise serializers.ValidationError(
-                {'error': 'Passwords dont match'})
+            raise serializers.ValidationError('Ungültige Anfragedaten.')
 
         if CustomUser.objects.filter(email=email).exists():
             raise serializers.ValidationError(
-                {'email': ['Diese E-Mail-Adresse wird bereits verwendet.']})
+                'Diese E-Mail-Adresse wird bereits verwendet.')
 
         if CustomUser.objects.filter(username=username).exists():
             raise serializers.ValidationError(
-                {'username': ['Dieser Benutzername ist bereits vergeben.']})
+                'Dieser Benutzername ist bereits vergeben.')
 
         account = CustomUser(
             email=self.validated_data['email'], username=self.validated_data['username'], type=self.validated_data['type'])
