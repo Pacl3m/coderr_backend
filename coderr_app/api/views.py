@@ -9,10 +9,11 @@ from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom
 from rest_framework.pagination import LimitOffsetPagination
+from django.db.models import Min
 
 
 class CustomLimitOffsetPagination(LimitOffsetPagination):
-    default_limit = 3
+    default_limit = 6
     limit_query_param = 'limit'
     offset_query_param = 'offset'
     max_limit = 100
@@ -24,6 +25,9 @@ class OfferViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly,
                           IsBusinessUser, IsOwnerOrAdmin]
     pagination_class = CustomLimitOffsetPagination
+    search_fields = ['title', 'description']
+    ordering_fields = ['updated_at', 'min_price']  # Erlaubte Felder
+    # ordering = ['-min_price']  # Standard-Sortierung (hier: neueste zuerst)
 
     def get_queryset(self):
         queryset = Offer.objects.all()
@@ -37,16 +41,25 @@ class OfferViewSet(viewsets.ModelViewSet):
             queryset = self.filter_by_min_price(queryset, min_price_param)
 
         # Filter nach min_delivery_time, falls vorhanden, aber berechnete Felder
-        max_delivery_time_param = self.request.query_params.get('max_delivery_time', None)
+        max_delivery_time_param = self.request.query_params.get(
+            'max_delivery_time', None)
         if max_delivery_time_param is not None:
-            queryset = self.filter_by_max_delivery_time(queryset, max_delivery_time_param)
+            queryset = self.filter_by_max_delivery_time(
+                queryset, max_delivery_time_param)
+
+        ordering_param = self.request.query_params.get('ordering', None)
+        if ordering_param is not None:
+            queryset = Offer.objects.annotate(
+                min_price=Min('details__price')
+            )
         return queryset
 
     def filter_by_min_price(self, queryset, min_price_param):
         # Filtern der Angebote nach min_price basierend auf Details-Daten
         filtered_queryset = []
         for offer in queryset:
-            min_price = min(detail.price for detail in offer.details.all()) if offer.details.exists() else None
+            min_price = min(detail.price for detail in offer.details.all(
+            )) if offer.details.exists() else None
             if min_price is not None and min_price <= float(min_price_param):
                 filtered_queryset.append(offer)
         return filtered_queryset
@@ -55,7 +68,8 @@ class OfferViewSet(viewsets.ModelViewSet):
         # Filtern der Angebote nach min_delivery_time basierend auf Details-Daten
         filtered_queryset = []
         for offer in queryset:
-            max_delivery_time = min(detail.delivery_time_in_days for detail in offer.details.all()) if offer.details.exists() else None
+            max_delivery_time = min(detail.delivery_time_in_days for detail in offer.details.all(
+            )) if offer.details.exists() else None
             if max_delivery_time is not None and max_delivery_time <= int(max_delivery_time_param):
                 filtered_queryset.append(offer)
         return filtered_queryset
