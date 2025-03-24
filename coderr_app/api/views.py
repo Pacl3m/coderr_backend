@@ -73,7 +73,7 @@ class OfferViewSet(viewsets.ModelViewSet):
             "username": user.username
         }
 
-        return Response(offer_data)
+        return Response(offer_data, status=status.HTTP_200_OK)
 
 
 class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
