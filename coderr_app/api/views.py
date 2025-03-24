@@ -32,11 +32,33 @@ class OfferViewSet(viewsets.ModelViewSet):
         if creator_id_param is not None:
             queryset = queryset.filter(user__id=creator_id_param)
 
-        # min_price_param = self.request.query_params.get('min_price', None)
-        # if min_price_param is not None:
-        #     queryset = queryset.filter(min_price<=min_price_param)
+        min_price_param = self.request.query_params.get('min_price', None)
+        if min_price_param is not None:
+            queryset = self.filter_by_min_price(queryset, min_price_param)
 
+        # Filter nach min_delivery_time, falls vorhanden, aber berechnete Felder
+        max_delivery_time_param = self.request.query_params.get('max_delivery_time', None)
+        if max_delivery_time_param is not None:
+            queryset = self.filter_by_max_delivery_time(queryset, max_delivery_time_param)
         return queryset
+
+    def filter_by_min_price(self, queryset, min_price_param):
+        # Filtern der Angebote nach min_price basierend auf Details-Daten
+        filtered_queryset = []
+        for offer in queryset:
+            min_price = min(detail.price for detail in offer.details.all()) if offer.details.exists() else None
+            if min_price is not None and min_price <= float(min_price_param):
+                filtered_queryset.append(offer)
+        return filtered_queryset
+
+    def filter_by_max_delivery_time(self, queryset, max_delivery_time_param):
+        # Filtern der Angebote nach min_delivery_time basierend auf Details-Daten
+        filtered_queryset = []
+        for offer in queryset:
+            max_delivery_time = min(detail.delivery_time_in_days for detail in offer.details.all()) if offer.details.exists() else None
+            if max_delivery_time is not None and max_delivery_time <= int(max_delivery_time_param):
+                filtered_queryset.append(offer)
+        return filtered_queryset
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

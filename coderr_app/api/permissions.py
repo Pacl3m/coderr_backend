@@ -42,22 +42,17 @@ class IsOwnerOrAdmin(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
-            print('1')
             return True
         else:
-            print('3')
             return bool((request.user == obj.user) or request.user.is_superuser)
 
 
 class IsBusinessUser(BasePermission):
 
     def has_permission(self, request, view):
-        print(request.method)
         if request.method in SAFE_METHODS:
-            print('4')
             return True
         else:
-            print('6')
             return bool(request.user.type == "business" or request.user.is_superuser)
 
 
@@ -65,7 +60,6 @@ class IsSuperUser(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
-            print('8')
             return True
         else:
             return bool(request.user.is_superuser)
@@ -74,10 +68,7 @@ class IsSuperUser(BasePermission):
 class IsOwnUserOrAdmin(BasePermission):
 
     def has_object_permission(self, request, view, obj):
-        print(request.user.pk, obj.pk, bool(request.user.pk == obj.pk))
         if request.method in SAFE_METHODS:
-            print('10')
             return True
         else:
-            print('11')
             return bool(request.user.pk == obj.pk or request.user.is_superuser)
