@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
-from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom
+from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Min
 
@@ -22,7 +22,7 @@ class CustomLimitOffsetPagination(LimitOffsetPagination):
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly,
+    permission_classes = [IsAuthenticatedOrRealOnlyCustom,
                           IsBusinessUser, IsOwnerOrAdmin]
     pagination_class = CustomLimitOffsetPagination
     search_fields = ['title', 'description']
@@ -55,13 +55,31 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except:
+            return Response({
+                'details': 'Ungültige Anfragedaten oder unvollständige Details.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save(user=self.request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
     def retrieve(self, request, pk=None):
-        offer = self.get_object()  # Holt die Offer-Instanz basierend auf pk
-        serializer = OfferSerializer(offer, context={'request': request})
-        user = offer.user  # Verknüpfter User des Angebots
+        if request.user.is_authenticated:
+            try:
+                offer = self.get_object()  # Holt die Offer-Instanz basierend auf pk
+                serializer = OfferSerializer(
+                    offer, context={'request': request})
+                user = offer.user  # Verknüpfter User des Angebots
+            except:
+                return Response({'details': 'Das Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({'details': 'Benutzer ist nicht authentifiziert.'}, status=status.HTTP_401_UNAUTHORIZED)
 
      # Serialisierte Offer-Daten
         offer_data = serializer.data
@@ -75,6 +93,13 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         return Response(offer_data, status=status.HTTP_200_OK)
 
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            kwargs['partial'] = True
+            return self.update(request, *args, **kwargs)
+        except:
+            return Response({'details': 'Das Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+
 
 class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
                          mixins.DestroyModelMixin):
@@ -82,7 +107,15 @@ class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
     serializer_class = OfferDetailSerializer
     # permission_classes = [IsAuthenticatedOrReadOnly &
     #                       IsSuperUser | IsOwnerOrAdmin]
-    permission_classes = [IsSuperUser]
+    permission_classes = [IsAuthenticatedCustom & IsSuperUser]
+
+    def retrieve(self, request, pk=None):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except:
+            return Response({'details': 'Das Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class OrderViewSet(viewsets.ModelViewSet):

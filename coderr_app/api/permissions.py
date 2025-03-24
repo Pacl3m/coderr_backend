@@ -38,6 +38,19 @@ class IsAuthenticatedCustom(BasePermission):
             raise error
         return True
 
+
+class IsAuthenticatedOrRealOnlyCustom(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        elif not request.user.is_authenticated:
+            # Raise APIException with custom message
+            error = APIException("Benutzer ist nicht authentifiziert.")
+            error.status_code = status.HTTP_401_UNAUTHORIZED  # Set status code here
+            raise error
+        return True
+
+
 class IsOwnerOrAdmin(BasePermission):
 
     def has_object_permission(self, request, view, obj):
@@ -47,11 +60,24 @@ class IsOwnerOrAdmin(BasePermission):
             return bool((request.user == obj.user) or request.user.is_superuser)
 
 
+# class IsBusinessUser(BasePermission):
+
+#     def has_permission(self, request, view):
+#         if request.method in SAFE_METHODS:
+#             return True
+#         else:
+#             return bool(request.user.type == "business" or request.user.is_superuser)
+
+
 class IsBusinessUser(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
+        elif (request.user.type != "business" or request.user.is_superuser):
+            error = APIException("Authentifizierter Benutzer ist kein 'business' Profil.")
+            error.status_code = status.HTTP_403_FORBIDDEN
+            raise error
         else:
             return bool(request.user.type == "business" or request.user.is_superuser)
 
