@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
-from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom
+from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Min
 
@@ -120,6 +120,7 @@ class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
+    permission_classes = [IsAuthenticatedCustom, IsCustomerUser]
 
     def get_serializer_class(self):
         if self.action == 'create':

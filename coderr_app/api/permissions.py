@@ -75,11 +75,26 @@ class IsBusinessUser(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         elif (request.user.type != "business" or request.user.is_superuser):
-            error = APIException("Authentifizierter Benutzer ist kein 'business' Profil.")
+            error = APIException(
+                "Authentifizierter Benutzer ist kein 'business' Profil.")
             error.status_code = status.HTTP_403_FORBIDDEN
             raise error
         else:
             return bool(request.user.type == "business" or request.user.is_superuser)
+
+
+class IsCustomerUser(BasePermission):
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        elif (request.user.type != "customer" or request.user.is_superuser):
+            error = APIException(
+                "Authentifizierter Benutzer ist kein 'customer' Profil.")
+            error.status_code = status.HTTP_403_FORBIDDEN
+            raise error
+        else:
+            return bool(request.user.type == "customer" or request.user.is_superuser)
 
 
 class IsSuperUser(BasePermission):
