@@ -88,12 +88,16 @@ class IsCustomerUser(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        elif (request.user.type != "customer" or request.user.is_superuser):
+        elif (request.user.is_superuser):
+            print('LDKDKDK')
+            return True
+        elif (request.user.type != "customer"):
             error = APIException(
                 "Authentifizierter Benutzer ist kein 'customer' Profil.")
             error.status_code = status.HTTP_403_FORBIDDEN
             raise error
         else:
+            print('KKKDKDK')
             return bool(request.user.type == "customer" or request.user.is_superuser)
 
 

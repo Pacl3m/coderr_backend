@@ -10,6 +10,44 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Min
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from .filters import ReviewFilter
+
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+
+        user = authenticate(username=username, password=password)
+
+        if user is not None:
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_201_CREATED)
+        return Response({"Ungültige Anfragedaten."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegistrationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegistrationSerializer(data=request.data)
+
+        if serializer.is_valid():
+            saved_account = serializer.save()
+            token, created = Token.objects.get_or_create(user=saved_account)
+            data = {
+                'token': token.key,
+                'username': saved_account.username,
+                'email': saved_account.email,
+                "user_id": saved_account.pk
+            }
+        else:
+            data = serializer.errors
+
+        return Response(data, status=status.HTTP_201_CREATED)
 
 
 class CustomLimitOffsetPagination(LimitOffsetPagination):
@@ -120,7 +158,7 @@ class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
-    permission_classes = [IsAuthenticatedCustom, IsCustomerUser]
+    permission_classes = [IsAuthenticatedCustom]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -128,23 +166,42 @@ class OrderViewSet(viewsets.ModelViewSet):
         return OrderSerializer
 
     def retrieve(self, request, *args, **kwargs):
-        order = self.get_object()
-        serializer = self.get_serializer(order)
-
-        return Response(serializer.data)
+        try:
+            order = self.get_object()
+            print(order)
+            serializer = self.get_serializer(order)
+            return Response(serializer.data)
+        except:
+            return Response(
+                {'details': 'Die angegebene Bestellung wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
 
     def partial_update(self, request, *args, **kwargs):
-        order = self.get_object()
-        serializer = self.get_serializer(
-            order, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if self.request.user.type != 'business':
+            raise PermissionDenied(
+                'Nur Business-User dürfen Bestellungen aktualisieren.')
 
-        return Response(serializer.data)
+        try:
+            order = self.get_object()
+            serializer = self.get_serializer(
+                order, data=request.data, partial=True)
+            erializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        except:
+            return Response(
+                {'details': 'Ungültiger Status oder unzulässige Felder in der Anfrage'}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
+        if self.request.user.type != 'customer':
+            raise PermissionDenied(
+                'Nur Customer-User dürfen Bestellungen erstellen.')
+
         customer_user = self.request.user
-        offer_detail = serializer.validated_data.pop('offer_detail')
+        offer_detail = serializer.validated_data.pop('offer_detail', None)
+
+        if offer_detail is None:
+            raise ValidationError(
+                {'details': 'Kein gültiges OfferDetail angegeben.'})
 
         serializer.save(
             customer_user=customer_user,
@@ -157,35 +214,51 @@ class OrderViewSet(viewsets.ModelViewSet):
             business_user=offer_detail.user,
             status='in_progress'
         )
-        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.is_superuser:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(
+                {'details': 'Benutzer hat keine Berechtigung, die Bestellung zu löschen.'}, status=status.HTTP_403_FORBIDDEN)
 
 
 class OrderCountViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticatedCustom]
+
     def retrieve(self, request, pk=None):
-        business_user = CustomUser.objects.filter(pk=pk).first()
+        try:
+            business_user = CustomUser.objects.filter(pk=pk).first()
 
-        if not business_user:
-            return Response({"error": "Business user not found."}, status=status.HTTP_404_NOT_FOUND)
+            if business_user.type != 'business':
+                return Response({"error": "Kein Geschäftsnutzer mit der angegebenen ID gefunden"}, status=status.HTTP_404_NOT_FOUND)
 
-        order_count = Order.objects.filter(
-            business_user=business_user, status='in_progress'
-        ).count()
-
-        return Response({"order_count": order_count})
+            order_count = Order.objects.filter(
+                business_user=business_user, status='in_progress'
+            ).count()
+            return Response({"order_count": order_count})
+        except:
+            return Response({"error": "Kein Geschäftsnutzer mit der angegebenen ID gefunden"}, status=status.HTTP_404_NOT_FOUND)
 
 
 class CompletedOrderCountViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticatedCustom]
+
     def retrieve(self, request, pk=None):
+        try:
+            business_user = CustomUser.objects.filter(pk=pk).first()
 
-        business_user = CustomUser.objects.filter(pk=pk).first()
-        if not business_user:
-            return Response({"error": "Business user not found."}, status=status.HTTP_404_NOT_FOUND)
+            if business_user.type != 'business':
+                return Response({"error": "Kein Geschäftsnutzer mit der angegebenen ID gefunden"}, status=status.HTTP_404_NOT_FOUND)
 
-        order_count = Order.objects.filter(
-            business_user=business_user, status='completed'
-        ).count()
-
-        return Response({"completed_order_count": order_count})
+            order_count = Order.objects.filter(
+                business_user=business_user, status='completed'
+            ).count()
+            return Response({"order_count": order_count})
+        except:
+            return Response({"error": "Kein Geschäftsnutzer mit der angegebenen ID gefunden"}, status=status.HTTP_404_NOT_FOUND)
 
 
 class ProfilViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
@@ -239,44 +312,10 @@ class ProfilTypeViewSet(generics.ListCreateAPIView):
         return CustomUser.objects.none()
 
 
-class LoginAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
-
-        user = authenticate(username=username, password=password)
-
-        if user is not None:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_201_CREATED)
-        return Response({"Ungültige Anfragedaten."}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class RegistrationView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = RegistrationSerializer(data=request.data)
-
-        if serializer.is_valid():
-            saved_account = serializer.save()
-            token, created = Token.objects.get_or_create(user=saved_account)
-            data = {
-                'token': token.key,
-                'username': saved_account.username,
-                'email': saved_account.email,
-                "user_id": saved_account.pk
-            }
-        else:
-            data = serializer.errors
-
-        return Response(data, status=status.HTTP_201_CREATED)
-
-
 class ReviewsViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
+    permission_classes = [IsAuthenticatedCustom, IsCustomerUser]
+    filterset_class = ReviewFilter
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -286,12 +325,35 @@ class ReviewsViewSet(viewsets.ModelViewSet):
         return ReviewSerializer
 
     def perform_create(self, serializer):
-        serializer.save(reviewer=self.request.user)
+        validated_data = serializer.validated_data
+        business_user = validated_data.get("business_user")
+        reviewer = self.request.user
+
+        if Review.objects.filter(business_user=business_user, reviewer=reviewer).exists():
+            raise PermissionDenied(
+                "Forbidden. Ein Benutzer kann nur eine Bewertung pro Geschäftsprofil abgeben.")
+
+        serializer.save(reviewer=reviewer)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(
             instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+
+        if instance.reviewer != self.request.user:
+            raise PermissionDenied(
+                "Forbidden. Der Benutzer ist nicht berechtigt, diese Bewertung zu bearbeiten.")
+
         serializer.save(reviewer=self.request.user)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.reviewer != self.request.user:
+            raise PermissionDenied(
+                "Forbidden. Der Benutzer ist nicht berechtigt, diese Bewertung zu löschen.")
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
