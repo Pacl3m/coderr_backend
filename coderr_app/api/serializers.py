@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models import Offer, OfferDetail, Order, CustomUser, Review
+from ..models import Offer, OfferDetail, Order, CustomUser, Review, BaseInfo
 
 
 class OfferDetailSerializer(serializers.ModelSerializer):
@@ -27,7 +27,7 @@ class OfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Offer
         fields = ['id', 'user', 'title', 'image',
-                  'description', 'details', 'user_details', 'min_price', 'min_delivery_time']
+                  'description', 'details', 'created_at', 'updated_at', 'user_details', 'min_price', 'min_delivery_time']
         extra_kwargs = {
             'user': {'read_only': True}
         }
@@ -228,3 +228,10 @@ class ReviewDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['rating', 'description']
+
+
+class BaseInfoSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = BaseInfo
+        fields = '__all__'

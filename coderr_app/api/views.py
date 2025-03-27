@@ -1,6 +1,6 @@
 from rest_framework import viewsets, generics
-from ..models import Offer, OfferDetail, Order, Review
-from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer
+from ..models import Offer, OfferDetail, Order, Review, BaseInfo
+from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer, BaseInfoSerializer
 from rest_framework.response import Response
 from rest_framework import status, mixins, viewsets
 from rest_framework.views import APIView
@@ -9,7 +9,7 @@ from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
 from rest_framework.pagination import LimitOffsetPagination
-from django.db.models import Min
+from django.db.models import Min, Avg
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .filters import ReviewFilter
 
@@ -21,12 +21,16 @@ class LoginAPIView(APIView):
         username = request.data.get("username")
         password = request.data.get("password")
 
+        if not username or not password:
+            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
         user = authenticate(username=username, password=password)
 
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)
             return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_201_CREATED)
-        return Response({"Ungültige Anfragedaten."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Invalid username or password."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RegistrationView(APIView):
@@ -357,3 +361,20 @@ class ReviewsViewSet(viewsets.ModelViewSet):
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BaseInfoView(viewsets.ViewSet):
+
+    def list(self, request, pk=None):
+        review_count = Review.objects.all().count() or 0
+        average_rating = Review.objects.aggregate(Avg('rating')) or 0
+        business_profile_count = CustomUser.objects.filter(
+            type='business').count() or 0
+        offer_count = Offer.objects.all().count() or 0
+
+        return Response({
+            "review_count": review_count,
+            "average_rating": average_rating['rating__avg'],
+            "business_profile_count": business_profile_count,
+            "offer_count": offer_count
+        }, status=status.HTTP_200_OK)
