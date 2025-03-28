@@ -68,13 +68,11 @@ class OfferViewSet(viewsets.ModelViewSet):
                           IsBusinessUser, IsOwnerOrAdmin]
     pagination_class = CustomLimitOffsetPagination
     search_fields = ['title', 'description']
-    ordering_fields = ['updated_at', 'min_price']  # Erlaubte Felder
-    # ordering = ['-min_price']  # Standard-Sortierung (hier: neueste zuerst)
+    ordering_fields = ['updated_at', 'min_price']
 
     def get_queryset(self):
         queryset = Offer.objects.annotate(
             min_price=Min('details__price'),
-            # Berechnet die kürzeste Lieferzeit
             max_delivery_time=Min('details__delivery_time_in_days')
         )
 
@@ -164,6 +162,13 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     permission_classes = [IsAuthenticatedCustom]
 
+    def get_queryset(self):
+        if self.request.user.type == 'customer':
+            queryset = Order.objects.filter(customer_user=self.request.user)
+        elif (self.request.user.type == 'business'):
+            queryset = Order.objects.filter(business_user=self.request.user)
+        return queryset
+
     def get_serializer_class(self):
         if self.action == 'create':
             return OrderDetailSerializer
@@ -188,7 +193,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             order = self.get_object()
             serializer = self.get_serializer(
                 order, data=request.data, partial=True)
-            erializer.is_valid(raise_exception=True)
+            serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
         except:
