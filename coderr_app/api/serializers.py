@@ -3,12 +3,10 @@ from ..models import Offer, OfferDetail, Order, CustomUser, Review, BaseInfo
 
 
 class OfferDetailSerializer(serializers.ModelSerializer):
-    # url = serializers.HyperlinkedIdentityField(view_name='offerdetails-detail')
 
     class Meta:
         model = OfferDetail
         exclude = ['offer', 'user']
-        # fields = ['id', 'url']
 
 
 class OfferDetailLinkSerializer(serializers.ModelSerializer):
@@ -51,7 +49,7 @@ class OfferSerializer(serializers.ModelSerializer):
         return min(detail.delivery_time_in_days for detail in offer_details)
 
     def get_user_details(self, obj):
-        user = obj.user  # Hier wird auf den verknüpften User der Offer-Instanz zugegriffen
+        user = obj.user
         return {
             "first_name": user.first_name,
             "last_name": user.last_name,
@@ -59,7 +57,6 @@ class OfferSerializer(serializers.ModelSerializer):
         }
 
     def to_representation(self, instance):
-        # Wenn der Request ein POST ist, entferne 'user_details'
         representation = super().to_representation(instance)
         if self.context['request'].method == 'POST':
             representation.pop('user_details', None)
@@ -228,10 +225,3 @@ class ReviewDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['rating', 'description']
-
-
-class BaseInfoSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = BaseInfo
-        fields = '__all__'

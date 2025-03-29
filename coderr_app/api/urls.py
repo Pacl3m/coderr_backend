@@ -19,5 +19,4 @@ urlpatterns = [
          ProfilTypeViewSet.as_view(), name='profilType-detail'),
     path('login/', LoginAPIView.as_view(), name='login-detail'),
     path('registration/', RegistrationView.as_view(), name='registration-detail'),
-    # path('answers/<int:pk>/', AnswerDetailView.as_view(), name='answer-detail'),
 ]

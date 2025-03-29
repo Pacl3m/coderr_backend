@@ -1,12 +1,12 @@
 from rest_framework import viewsets, generics
-from ..models import Offer, OfferDetail, Order, Review, BaseInfo
-from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer, BaseInfoSerializer
+from ..models import Offer, OfferDetail, Order, Review
+from .serializers import OfferSerializer, OfferDetailSerializer, OrderSerializer, UserSerializer, CustomUser, CustomerUserSerializer, BusinessUserSerializer, RegistrationSerializer, ReviewSerializer, ReviewDetailSerializer, OrderDetailSerializer
 from rest_framework.response import Response
 from rest_framework import status, mixins, viewsets
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
 from rest_framework.pagination import LimitOffsetPagination
 from django.db.models import Min, Avg
@@ -145,8 +145,6 @@ class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, vie
                          mixins.DestroyModelMixin):
     queryset = OfferDetail.objects.all()
     serializer_class = OfferDetailSerializer
-    # permission_classes = [IsAuthenticatedOrReadOnly &
-    #                       IsSuperUser | IsOwnerOrAdmin]
     permission_classes = [IsAuthenticatedCustom & IsSuperUser]
 
     def retrieve(self, request, pk=None):
@@ -276,11 +274,6 @@ class ProfilViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.D
     permission_classes = [IsAuthenticatedCustom & IsOwnUserOrAdmin]
 
     def retrieve(self, request, *args, **kwargs):
-        # if not request.user.is_authenticated:
-        #     return Response(
-        #         {"Benutzer ist nicht authentifiziert."},
-        #         status=status.HTTP_401_UNAUTHORIZED
-        #     )
         try:
             instance = self.get_object()
         except:
