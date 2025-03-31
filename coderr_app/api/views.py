@@ -147,18 +147,6 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         return Response(offer_data, status=status.HTTP_200_OK)
 
-    # def partial_update(self, request, *args, **kwargs):
-    #     try:
-    #         instance = self.get_object()
-    #         print(instance)
-    #     except:
-    #         return Response({'details': 'dddddDas Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
-        # try:
-        #     kwargs['partial'] = True
-        #     return self.update(request, *args, **kwargs)
-        # except:
-        #     return Response({'details': 'dddddDas Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
-
 
 class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
                          mixins.DestroyModelMixin):
@@ -194,7 +182,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             order = self.get_object()
-            print(order)
             serializer = self.get_serializer(order)
             return Response(serializer.data)
         except:
@@ -213,17 +200,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         # 3️⃣ `partial=True` setzen und Update durchführen
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
-
-        # try:
-        #     order = self.get_object()
-        #     serializer = self.get_serializer(
-        #         order, data=request.data, partial=True)
-        #     serializer.is_valid(raise_exception=True)
-        #     serializer.save()
-        #     return Response(serializer.data)
-        # except:
-        #     return Response(
-        #         {'details': 'Ungültiger Status oder unzulässige Felder in der Anfrage'}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         if self.request.user.type != 'customer':

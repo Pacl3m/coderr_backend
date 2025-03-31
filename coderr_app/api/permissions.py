@@ -28,9 +28,6 @@ class IsOwnerOrAdmin(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return True
-        # else:
-        #     print('IsOwnerOrAdmin', bool((request.user == obj.user) or request.user.is_superuser))
-        #     return bool((request.user == obj.user) or request.user.is_superuser)
         elif ((request.user != obj.user) or request.user.is_superuser):
             error = APIException(
                 {'details': "Authentifizierter Benutzer ist nicht der Eigentümer des Angebots."})
