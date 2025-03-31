@@ -208,6 +208,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         customer_user = self.request.user
         offer_detail = serializer.validated_data.pop('offer_detail', None)
+        offer_title = serializer.validated_data.pop('title', None) or offer_detail.offer.title
 
         if offer_detail is None:
             raise ValidationError(
@@ -215,7 +216,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer.save(
             customer_user=customer_user,
-            title=offer_detail.title,
+            title=offer_title,
             revisions=offer_detail.revisions,
             delivery_time_in_days=offer_detail.delivery_time_in_days,
             price=offer_detail.price,
