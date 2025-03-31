@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from rest_framework.permissions import AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Min, Avg
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .filters import ReviewFilter
@@ -48,24 +48,25 @@ class RegistrationView(APIView):
                 'email': saved_account.email,
                 "user_id": saved_account.pk
             }
+            return Response(data, status=status.HTTP_201_CREATED)
+
         else:
-            data = serializer.errors
-
-        return Response(data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CustomLimitOffsetPagination(LimitOffsetPagination):
+class CustomLimitOffsetPagination(PageNumberPagination):
     default_limit = 6
+    page_size_query_param = 'page_size'
     limit_query_param = 'limit'
     offset_query_param = 'offset'
-    max_limit = 100
+    max_limit = 10
 
 
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
-    permission_classes = [IsAuthenticatedOrRealOnlyCustom,
-                          IsBusinessUser, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticatedOrRealOnlyCustom, IsBusinessUser,
+                          IsOwnerOrAdmin]
     pagination_class = CustomLimitOffsetPagination
     search_fields = ['title', 'description']
     ordering_fields = ['updated_at', 'min_price']
@@ -79,19 +80,32 @@ class OfferViewSet(viewsets.ModelViewSet):
         # Filter nach Ersteller
         creator_id_param = self.request.query_params.get('creator_id')
         if creator_id_param:
-            queryset = queryset.filter(user__id=creator_id_param)
+            if creator_id_param.isdigit():
+                queryset = queryset.filter(user__id=creator_id_param)
+            else:
+                raise ValidationError(
+                    {'details': 'creator_id muss eine Zahl sein'})
 
         # Filter nach Mindestpreis
         min_price_param = self.request.query_params.get('min_price')
-        if min_price_param:
-            queryset = queryset.filter(min_price__lte=float(min_price_param))
+        if min_price_param is not None:
+            if min_price_param.isdigit():
+                queryset = queryset.filter(
+                    min_price__gte=float(min_price_param))
+            else:
+                raise ValidationError(
+                    {'details': 'min_price_param muss eine Zahl sein'})
 
         # Filter nach maximaler Lieferzeit
         max_delivery_time_param = self.request.query_params.get(
             'max_delivery_time')
-        if max_delivery_time_param:
-            queryset = queryset.filter(
-                max_delivery_time__lte=int(max_delivery_time_param))
+        if max_delivery_time_param is not None:
+            if max_delivery_time_param.isdigit():
+                queryset = queryset.filter(
+                    max_delivery_time__lte=int(max_delivery_time_param))
+            else:
+                raise ValidationError(
+                    {'details': 'max_delivery_time muss eine Zahl sein'})
 
         return queryset
 
@@ -133,12 +147,17 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         return Response(offer_data, status=status.HTTP_200_OK)
 
-    def partial_update(self, request, *args, **kwargs):
-        try:
-            kwargs['partial'] = True
-            return self.update(request, *args, **kwargs)
-        except:
-            return Response({'details': 'Das Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+    # def partial_update(self, request, *args, **kwargs):
+    #     try:
+    #         instance = self.get_object()
+    #         print(instance)
+    #     except:
+    #         return Response({'details': 'dddddDas Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        # try:
+        #     kwargs['partial'] = True
+        #     return self.update(request, *args, **kwargs)
+        # except:
+        #     return Response({'details': 'dddddDas Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class OfferDetailViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
@@ -183,20 +202,28 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'details': 'Die angegebene Bestellung wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
 
     def partial_update(self, request, *args, **kwargs):
-        if self.request.user.type != 'business':
-            raise PermissionDenied(
-                'Nur Business-User dürfen Bestellungen aktualisieren.')
+        # 1️⃣ Prüfen, ob die Instanz existiert → sonst 404
+        instance = self.get_object()  # Ruft das Objekt oder gibt 404 zurück
 
-        try:
-            order = self.get_object()
-            serializer = self.get_serializer(
-                order, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
-        except:
-            return Response(
-                {'details': 'Ungültiger Status oder unzulässige Felder in der Anfrage'}, status=status.HTTP_400_BAD_REQUEST)
+        # 2️⃣ Prüfen, ob der Nutzer berechtigt ist → sonst 403
+        if request.user != instance.business_user:
+            raise PermissionDenied(
+                'Benutzer hat keine Berechtigung, diese Bestellung zu aktualisieren.')
+
+        # 3️⃣ `partial=True` setzen und Update durchführen
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+        # try:
+        #     order = self.get_object()
+        #     serializer = self.get_serializer(
+        #         order, data=request.data, partial=True)
+        #     serializer.is_valid(raise_exception=True)
+        #     serializer.save()
+        #     return Response(serializer.data)
+        # except:
+        #     return Response(
+        #         {'details': 'Ungültiger Status oder unzulässige Felder in der Anfrage'}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         if self.request.user.type != 'customer':
@@ -263,7 +290,7 @@ class CompletedOrderCountViewSet(viewsets.ViewSet):
             order_count = Order.objects.filter(
                 business_user=business_user, status='completed'
             ).count()
-            return Response({"order_count": order_count})
+            return Response({"completed_order_count": order_count})
         except:
             return Response({"error": "Kein Geschäftsnutzer mit der angegebenen ID gefunden"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -286,10 +313,10 @@ class ProfilViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.D
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, *args, **kwargs):
-        pk = kwargs.get('pk')  # Zugriff auf die in der URL angegebene pk
+        pk = kwargs.get('pk')
         if not (request.user.id == int(pk)) and not request.user.is_superuser:
             return Response(
-                {"Authentifizierter Benutzer ist nicht der Eigentümer des Profils."},
+                {'details': "Authentifizierter Benutzer ist nicht der Eigentümer des Profils."},
                 status=status.HTTP_403_FORBIDDEN
             )
         kwargs['partial'] = True

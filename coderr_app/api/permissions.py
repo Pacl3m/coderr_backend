@@ -28,6 +28,14 @@ class IsOwnerOrAdmin(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return True
+        # else:
+        #     print('IsOwnerOrAdmin', bool((request.user == obj.user) or request.user.is_superuser))
+        #     return bool((request.user == obj.user) or request.user.is_superuser)
+        elif ((request.user != obj.user) or request.user.is_superuser):
+            error = APIException(
+                {'details': "Authentifizierter Benutzer ist nicht der Eigentümer des Angebots."})
+            error.status_code = status.HTTP_403_FORBIDDEN
+            raise error
         else:
             return bool((request.user == obj.user) or request.user.is_superuser)
 
@@ -39,7 +47,7 @@ class IsBusinessUser(BasePermission):
             return True
         elif (request.user.type != "business" or request.user.is_superuser):
             error = APIException(
-                "Authentifizierter Benutzer ist kein 'business' Profil.")
+                {'details': "Authentifizierter Benutzer ist kein 'business' Profil."})
             error.status_code = status.HTTP_403_FORBIDDEN
             raise error
         else:
@@ -52,7 +60,6 @@ class IsCustomerUser(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         elif (request.user.is_superuser):
-            print('LDKDKDK')
             return True
         elif (request.user.type != "customer"):
             error = APIException(
@@ -60,7 +67,6 @@ class IsCustomerUser(BasePermission):
             error.status_code = status.HTTP_403_FORBIDDEN
             raise error
         else:
-            print('KKKDKDK')
             return bool(request.user.type == "customer" or request.user.is_superuser)
 
 

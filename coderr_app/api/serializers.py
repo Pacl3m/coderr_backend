@@ -192,15 +192,16 @@ class RegistrationSerializer(serializers.ModelSerializer):
         email = self.validated_data['email']
 
         if pw != repeated_pw:
-            raise serializers.ValidationError('Ungültige Anfragedaten.')
+            raise serializers.ValidationError(
+                {'details': 'Ungültige Anfragedaten.'})
 
         if CustomUser.objects.filter(email=email).exists():
             raise serializers.ValidationError(
-                'Diese E-Mail-Adresse wird bereits verwendet.')
+                {'details': 'Diese E-Mail-Adresse wird bereits verwendet.'})
 
         if CustomUser.objects.filter(username=username).exists():
             raise serializers.ValidationError(
-                'Dieser Benutzername ist bereits vergeben.')
+                {'details': 'Dieser Benutzername ist bereits vergeben.'})
 
         account = CustomUser(
             email=self.validated_data['email'], username=self.validated_data['username'], type=self.validated_data['type'])
