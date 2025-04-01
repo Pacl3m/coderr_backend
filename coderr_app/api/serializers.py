@@ -8,6 +8,20 @@ class OfferDetailSerializer(serializers.ModelSerializer):
         model = OfferDetail
         exclude = ['offer', 'user']
 
+    def validate(self, data):
+        required_fields = ['title', 'revisions',
+                           'delivery_time_in_days', 'price', 'features', 'offer_type']
+
+        missing_fields = [
+            field for field in required_fields if field not in data]
+
+        if missing_fields:
+            raise serializers.ValidationError(
+                {field: f"{field} ist erforderlich." for field in missing_fields}
+            )
+
+        return data
+
 
 class OfferDetailLinkSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='offerdetails-detail')

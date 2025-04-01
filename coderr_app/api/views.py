@@ -28,7 +28,7 @@ class LoginAPIView(APIView):
 
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)
-            return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_201_CREATED)
+            return Response({"token": token.key, "username": username, "email": user.email, "user_id": user.pk}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Invalid username or password."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -79,6 +79,7 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         # Filter nach Ersteller
         creator_id_param = self.request.query_params.get('creator_id')
+        print(creator_id_param)
         if creator_id_param:
             if creator_id_param.isdigit():
                 queryset = queryset.filter(user__id=creator_id_param)
@@ -88,7 +89,7 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         # Filter nach Mindestpreis
         min_price_param = self.request.query_params.get('min_price')
-        if min_price_param is not None:
+        if min_price_param:
             if min_price_param.isdigit():
                 queryset = queryset.filter(
                     min_price__gte=float(min_price_param))
@@ -99,7 +100,7 @@ class OfferViewSet(viewsets.ModelViewSet):
         # Filter nach maximaler Lieferzeit
         max_delivery_time_param = self.request.query_params.get(
             'max_delivery_time')
-        if max_delivery_time_param is not None:
+        if max_delivery_time_param:
             if max_delivery_time_param.isdigit():
                 queryset = queryset.filter(
                     max_delivery_time__lte=int(max_delivery_time_param))
@@ -209,6 +210,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         customer_user = self.request.user
         offer_detail = serializer.validated_data.pop('offer_detail', None)
         offer_title = serializer.validated_data.pop('title', None) or offer_detail.offer.title
+        print(offer_detail.offer.title)
 
         if offer_detail is None:
             raise ValidationError(
