@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
 from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
 from django.db.models import Min, Avg
+from decimal import Decimal
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .filters import ReviewFilter
 
@@ -54,28 +55,9 @@ class RegistrationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class CustomLimitOffsetPagination(LimitOffsetPagination):
-#     default_limit = 4
-#     # limit_query_param = 'limit'
-#     # offset_query_param = 'offset'
-#     max_limit = 10
-
-#     def get_limit(self, request):
-#         limit = request.query_params.get('page_size') or request.query_params.get('limit')
-#         if limit:
-#             try:
-#                 limit = int(limit)
-#                 if limit > self.max_limit:
-#                     return self.max_limit
-#                 return limit
-#             except ValueError:
-#                 pass
-#         return self.default_limit
-
 class CustomLimitOffsetPagination(PageNumberPagination):
     page_size = 6
     page_size_query_param = 'page_size'
-    max_page_size = 10  
 
 
 class OfferViewSet(viewsets.ModelViewSet):
@@ -205,15 +187,12 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {'details': 'Die angegebene Bestellung wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
 
     def partial_update(self, request, *args, **kwargs):
-        # 1️⃣ Prüfen, ob die Instanz existiert → sonst 404
-        instance = self.get_object()  # Ruft das Objekt oder gibt 404 zurück
+        instance = self.get_object()
 
-        # 2️⃣ Prüfen, ob der Nutzer berechtigt ist → sonst 403
         if request.user != instance.business_user:
             raise PermissionDenied(
                 'Benutzer hat keine Berechtigung, diese Bestellung zu aktualisieren.')
 
-        # 3️⃣ `partial=True` setzen und Update durchführen
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 
@@ -226,7 +205,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         offer_detail = serializer.validated_data.pop('offer_detail', None)
         offer_title = serializer.validated_data.pop(
             'title', None) or offer_detail.offer.title
-        print(offer_detail.offer.title)
 
         if offer_detail is None:
             raise ValidationError(
@@ -387,14 +365,16 @@ class BaseInfoView(viewsets.ViewSet):
 
     def list(self, request, pk=None):
         review_count = Review.objects.all().count() or 0
-        average_rating = Review.objects.aggregate(Avg('rating')) or 0
+        average_rating = Review.objects.aggregate(
+            Avg('rating'))['rating__avg'] or 0
+        average_rating_rounded = round(Decimal(average_rating), 1)
         business_profile_count = CustomUser.objects.filter(
             type='business').count() or 0
         offer_count = Offer.objects.all().count() or 0
 
         return Response({
             "review_count": review_count,
-            "average_rating": average_rating['rating__avg'],
+            "average_rating": average_rating_rounded,
             "business_profile_count": business_profile_count,
             "offer_count": offer_count
         }, status=status.HTTP_200_OK)
