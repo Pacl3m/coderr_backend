@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from rest_framework.permissions import AllowAny
 from .permissions import IsOwnerOrAdmin, IsBusinessUser, IsSuperUser, IsOwnUserOrAdmin, IsAuthenticatedCustom, IsAuthenticatedOrRealOnlyCustom, IsCustomerUser
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
 from django.db.models import Min, Avg
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .filters import ReviewFilter
@@ -54,12 +54,28 @@ class RegistrationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# class CustomLimitOffsetPagination(LimitOffsetPagination):
+#     default_limit = 4
+#     # limit_query_param = 'limit'
+#     # offset_query_param = 'offset'
+#     max_limit = 10
+
+#     def get_limit(self, request):
+#         limit = request.query_params.get('page_size') or request.query_params.get('limit')
+#         if limit:
+#             try:
+#                 limit = int(limit)
+#                 if limit > self.max_limit:
+#                     return self.max_limit
+#                 return limit
+#             except ValueError:
+#                 pass
+#         return self.default_limit
+
 class CustomLimitOffsetPagination(PageNumberPagination):
-    default_limit = 6
+    page_size = 6
     page_size_query_param = 'page_size'
-    limit_query_param = 'limit'
-    offset_query_param = 'offset'
-    max_limit = 10
+    max_page_size = 10  
 
 
 class OfferViewSet(viewsets.ModelViewSet):
@@ -79,7 +95,6 @@ class OfferViewSet(viewsets.ModelViewSet):
 
         # Filter nach Ersteller
         creator_id_param = self.request.query_params.get('creator_id')
-        print(creator_id_param)
         if creator_id_param:
             if creator_id_param.isdigit():
                 queryset = queryset.filter(user__id=creator_id_param)
@@ -209,7 +224,8 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         customer_user = self.request.user
         offer_detail = serializer.validated_data.pop('offer_detail', None)
-        offer_title = serializer.validated_data.pop('title', None) or offer_detail.offer.title
+        offer_title = serializer.validated_data.pop(
+            'title', None) or offer_detail.offer.title
         print(offer_detail.offer.title)
 
         if offer_detail is None:
