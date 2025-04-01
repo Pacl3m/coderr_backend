@@ -124,10 +124,10 @@ class OfferViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, pk=None):
         if request.user.is_authenticated:
             try:
-                offer = self.get_object()  # Holt die Offer-Instanz basierend auf pk
+                offer = self.get_object()
                 serializer = OfferSerializer(
                     offer, context={'request': request})
-                user = offer.user  # Verknüpfter User des Angebots
+                user = offer.user 
             except:
                 return Response({'details': 'Das Angebot mit der angegebenen ID wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
         else:
